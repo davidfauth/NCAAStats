@@ -1,0 +1,41 @@
+package com.pfb.schema;
+
+import org.neo4j.graphdb.RelationshipType;
+
+public enum RelationshipTypes implements RelationshipType {
+    Blocked_Field_Goal,
+    Blocked_Punt,
+    Blocked_Punt_Touchdown,
+    Coin_Toss,
+    End_Period,
+    End_of_Game,
+    End_of_Half,
+    Field_Goal_Good,
+    Field_Goal_Missed,
+    Fumble_Recovery_Opponent,
+    Fumble_Recovery_Own,
+    Fumble_Return_Touchdown,
+    Interception_Return_Touchdown,
+    Kickoff,
+    Kickoff_Return_Offense,
+    Kickoff_Return_Touchdown,
+    Missed_Field_Goal_Return,
+    Pass_Incompletion,
+    Pass_Interception_Return,
+    Pass_Reception,
+    Passing_Touchdown,
+    Penalty,
+    Punt,
+    Punt_Return_Touchdown,
+    Rush,
+    Rushing_Touchdown,
+    Sack,
+    Safety,
+    Timeout,
+    Home_Team,
+    Away_Team,
+    HAS_PLAY_IN_DRIVE,
+    HAS_HOME_TEAM,
+    HAS_AWAY_TEAM,
+    HAS_DRIVE
+}

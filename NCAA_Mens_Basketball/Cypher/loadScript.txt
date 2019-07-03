@@ -1,0 +1,197 @@
+// Indexes
+
+CREATE INDEX ON :School(turner_name);
+CREATE INDEX ON :Conference(conf_id);
+CREATE INDEX ON :Venue(venue_name);
+CREATE INDEX ON :School(id);
+CREATE INDEX ON :Game(game_id);
+CREATE INDEX ON :SchoolGameStats(id,game_id);
+CREATE INDEX ON :Player(id);
+
+USING PERIODIC COMMIT 1000
+LOAD CSV WITH HEADERS FROM "https://neo4j-fauth.s3.amazonaws.com/ncaa/mbb_teams.csv" as row
+MERGE (s:School {turner_name:row.turner_name})
+ON CREATE SET s.market = row.market,
+s.id=row.id
+ON MATCH SET s.market = row.market,
+s.id=row.id;
+
+USING PERIODIC COMMIT 1000
+LOAD CSV WITH HEADERS FROM "https://neo4j-fauth.s3.amazonaws.com/ncaa/mbb_teams.csv" as row
+MERGE (c:Conference {conf_id: conf_id})
+ON CREATE SET 
+c.conf_name = row.conf_name,
+c.conf_alias = row.conf_alias;
+
+// School to League
+USING PERIODIC COMMIT 1000
+LOAD CSV WITH HEADERS FROM "https://neo4j-fauth.s3.amazonaws.com/ncaa/mbb_teams.csv" as row
+MATCH (s:School {turner_name:row.turner_name})
+MATCH (c:Conference {conf_id: row.conf_id})
+MERGE (s)-[:PLAYS_IN]->(c);
+
+// Create Venues
+USING PERIODIC COMMIT 1000
+LOAD CSV WITH HEADERS FROM "https://neo4j-fauth.s3.amazonaws.com/ncaa/mbb_teams.csv" as row
+MERGE (v:Venue {venue_name: row.venue_name})
+ON CREATE SET 
+v.venue_capacity = row.venue_capacity;
+
+USING PERIODIC COMMIT 1000
+LOAD CSV WITH HEADERS FROM "https://neo4j-fauth.s3.amazonaws.com/ncaa/mbb_teams.csv" as row
+MATCH (s:School {turner_name:row.turner_name})
+MATCH (v:Venue {venue_name: row.venue_name})
+MERGE (s)-[:HAS_HOME_ARENA]->(v);
+
+// Season
+LOAD CSV WITH HEADERS FROM "https://neo4j-fauth.s3.amazonaws.com/ncaa/mbb_teams_games_sr.csv" as row
+merge (sea:Season {season:row.season});
+
+// create Game
+LOAD CSV WITH HEADERS FROM "https://neo4j-fauth.s3.amazonaws.com/ncaa/mbb_teams_games_sr.csv" as row
+merge (g:Game {game_id:row.game_id})
+on match set g.conference_game = row.conference_game,
+g.tournament_type = row.tournament_type
+on create set g.conference_game = row.conference_game,
+g.tournament_type = row.tournament_type;
+
+
+LOAD CSV WITH HEADERS FROM "https://neo4j-fauth.s3.amazonaws.com/ncaa/mbb_teams_games_sr.csv" as row
+match (g:Game {game_id:row.game_id})
+match (sea:Season {season:row.season})
+merge (g)-[:PLAYED_IN_SEASON]->(sea);
+
+LOAD CSV WITH HEADERS FROM "https://neo4j-fauth.s3.amazonaws.com/ncaa/mbb_teams_games_sr.csv" as row
+match (g:Game {game_id:row.game_id})
+match (s:School {id:row.team_id})
+merge (s)-[:HOME_TEAM]->(g);
+
+// Away Team
+LOAD CSV WITH HEADERS FROM "https://neo4j-fauth.s3.amazonaws.com/ncaa/mbb_teams_games_sr.csv" as row
+match (g:Game {game_id:row.game_id})
+match (s:School {id:row.team_id})
+merge (s)-[:HOME_TEAM]->(g);
+
+LOAD CSV WITH HEADERS FROM "https://neo4j-fauth.s3.amazonaws.com/ncaa/mbb_teams_games_sr.csv" as row
+with row where row.home_team = 'true'
+match (g:Game {game_id:row.game_id})
+match (s:School {id:row.team_id})
+merge (s)-[:HOME_TEAM]->(g);
+
+LOAD CSV WITH HEADERS FROM "https://neo4j-fauth.s3.amazonaws.com/ncaa/mbb_teams_games_sr.csv" as row
+with row where row.home_team = 'false'
+match (g:Game {game_id:row.game_id})
+match (s:School {id:row.team_id})
+merge (s)-[:AWAY_TEAM]->(g);
+
+
+LOAD CSV WITH HEADERS FROM "https://neo4j-fauth.s3.amazonaws.com/ncaa/mbb_teams_games_sr.csv" as row
+with row where row.home_team = 'false'
+match (g:Game {game_id:row.game_id})
+set g.game_date=row.scheduled_date;
+
+
+LOAD CSV WITH HEADERS FROM "https://neo4j-fauth.s3.amazonaws.com/ncaa/mbb_teams_games_sr.csv" as row
+with row where row.home_team = 'true'
+merge (sgs:SchoolGameStats {id:row.team_id,game_id:row.game_id})
+on create set
+sgs.rebounds = toInteger(row.rebounds),
+sgs.field_goals_att = toInteger(row.field_goals_att),
+sgs.points_game = toInteger(row.points_game),
+sgs.points_off_turnovers = toInteger(row.points_off_turnovers),
+sgs.turnovers = toInteger(row.turnovers),
+sgs.three_points_made = toInteger(row.three_points_made),
+sgs.field_goals_pct = toFloat(row.field_goals_pct),
+sgs.three_points_att = toInteger(row.three_points_att),
+sgs.three_points_pct = toFloat(row.three_points_pct),
+sgs.win = row.win
+on match set
+sgs.rebounds = toInteger(row.rebounds),
+sgs.field_goals_att = toInteger(row.field_goals_att),
+sgs.points_game = toInteger(row.points_game),
+sgs.points_off_turnovers = toInteger(row.points_off_turnovers),
+sgs.turnovers = toInteger(row.turnovers),
+sgs.three_points_made = toInteger(row.three_points_made),
+sgs.field_goals_pct = toFloat(row.field_goals_pct),
+sgs.three_points_att = toInteger(row.three_points_att),
+sgs.three_points_pct = toFloat(row.three_points_pct),
+sgs.win = row.win;
+
+
+using periodic commit 10000
+LOAD CSV WITH HEADERS FROM "https://neo4j-fauth.s3.amazonaws.com/ncaa/mbb_teams_games_sr.csv" as row
+with row where row.home_team = 'true'
+match (sgs:SchoolGameStats {id:row.team_id,game_id:row.game_id})
+match (g:Game {game_id:row.game_id})
+match (s:School {id:row.team_id})
+merge (g)-[:HAS_GAME_STATS]->(sgs)
+merge (s)-[:HAS_GAME_STATS]->(sgs);
+
+LOAD CSV WITH HEADERS FROM "https://neo4j-fauth.s3.amazonaws.com/ncaa/mbb_teams_games_sr.csv" as row
+with row where row.home_team = 'false'
+merge (sgs:SchoolGameStats {id:row.team_id,game_id:row.game_id})
+on create set
+sgs.rebounds = toInteger(row.rebounds),
+sgs.field_goals_att = toInteger(row.field_goals_att),
+sgs.points_game = toInteger(row.points_game),
+sgs.points_off_turnovers = toInteger(row.points_off_turnovers),
+sgs.turnovers = toInteger(row.turnovers),
+sgs.three_points_made = toInteger(row.three_points_made),
+sgs.field_goals_pct = toFloat(row.field_goals_pct),
+sgs.three_points_att = toInteger(row.three_points_att),
+sgs.three_points_pct = toFloat(row.three_points_pct),
+sgs.win = row.win
+on match set
+sgs.rebounds = toInteger(row.rebounds),
+sgs.field_goals_att = toInteger(row.field_goals_att),
+sgs.points_game = toInteger(row.points_game),
+sgs.points_off_turnovers = toInteger(row.points_off_turnovers),
+sgs.turnovers = toInteger(row.turnovers),
+sgs.three_points_made = toInteger(row.three_points_made),
+sgs.field_goals_pct = toFloat(row.field_goals_pct),
+sgs.three_points_att = toInteger(row.three_points_att),
+sgs.three_points_pct = toFloat(row.three_points_pct),
+sgs.win = row.win;
+
+
+
+create index on :PlayerGameStats(player_id,game_id);
+
+load csv with headers from "https://neo4j-fauth.s3.amazonaws.com/ncaa/mbb_teams_players_sr.csv" as row
+with row 
+merge (pgs:PlayerGameStats {player_id:row.player_id,game_id:row.game_id})
+set pgs.played = row.played;
+
+using periodic commit 10000
+load csv with headers from "https://neo4j-fauth.s3.amazonaws.com/ncaa/mbb_teams_players_sr.csv" as row
+with row limit 10
+match (pgs:PlayerGameStats {player_id:row.player_id,game_id:row.game_id})
+match (p:Player {id:row.player_id})
+match (g:Game {game_id:row.game_id})
+merge (p)-[:HAS_PLAYER_GAME_STATS]->(pgs)
+merge (pgs)-[:HAS_PLAYER_GAME_STATS]->(g);
+
+
+using periodic commit 10000
+load csv with headers from "https://neo4j-fauth.s3.amazonaws.com/ncaa/mbb_teams_players_sr.csv" as row
+with row
+match (pgs:PlayerGameStats {player_id:row.player_id,game_id:row.game_id})
+match (s:School {id:row.team_id})
+merge (pgs)-[:HAS_PLAYER_GAME_STATS_FOR_SCHOOL]->(s);
+
+
+// Query
+match (s:School {turner_name:'University of North Carolina, Chapel Hill'})-[]-(g:Game)-[:PLAYED_IN_SEASON]->(sea:Season {season:'2017'})
+with s, g
+match (s)-[]->(sgs:SchoolGameStats)-[]-(g)-[:AWAY_TEAM|:HOME_TEAM]-(opp:School)
+where s<>opp
+with  s, opp,sgs,g
+match (opp)-[]-(sgs2:SchoolGameStats)-[]-(g)
+return s.turner_name, opp.turner_name, sgs.points_game, sgs2.points_game,g.game_date order by g.game_date asc;
+
+match (s:School {turner_name:'University of North Carolina, Chapel Hill'})-[]-(g:Game)-[:PLAYED_IN_SEASON]->(sea:Season {season:'2017'})
+with s, g
+match (g)-[:AWAY_TEAM]-(s)-[]->(sgs:SchoolGameStats {win:'true'})-[]-(g)
+return s.turner_name, count(sgs.win);
+
+
